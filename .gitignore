@@ -127,3 +127,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# ignore output files
+bgg_files/*
+images/*
+bgg_stats.csv
+veronicasalm.xml
