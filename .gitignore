@@ -132,4 +132,4 @@ dmypy.json
 bgg_files/*
 images/*
 bgg_stats.csv
-veronicasalm.xml
+*.xml
