@@ -14,6 +14,10 @@ and contiains the following six columns, in order:
 This script analyzes the output JSON file and compiles some interesting
 statistics for the games overall, games kept, and games culled.
 """
+
+# TODO: add command line argument parsing
+# TODO: store the results to an output file
+# TODO: write README with running instructions and summary
 import csv, json, sys
 from collections import defaultdict
 from settings import DEBUG, ID, NAME, YEAR, RANK, MIN_PLAYERS, MAX_PLAYERS, \
