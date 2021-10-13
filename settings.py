@@ -22,3 +22,5 @@ P2 = "Sunniva"
 VERDICT = "verdict"
 KEEP= "KEEP"
 CULL = "CULL"
+
+GAMES_LIST = "games"

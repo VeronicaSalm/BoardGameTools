@@ -22,7 +22,7 @@ import csv, json, sys
 from collections import defaultdict
 from settings import DEBUG, ID, NAME, YEAR, RANK, MIN_PLAYERS, MAX_PLAYERS, \
                      COMPLEXITY, RATING, NUM_RATINGS, NUM_COMMENTS, DESIGNERS, \
-                     PUBLISHERS, ARTISTS, WEEK, P1, P2, VERDICT, KEEP, CULL
+                     PUBLISHERS, ARTISTS, WEEK, P1, P2, VERDICT, KEEP, CULL, GAMES_LIST
 
 if __name__ == "__main__":
     in_csv = "Keep_or_Cull_Links.csv"
@@ -62,43 +62,74 @@ if __name__ == "__main__":
             games[bg_id][P2] = row[4]
             games[bg_id][VERDICT] = row[5]
 
+            name = games[bg_id][NAME]
+
+            if games[bg_id][VERDICT] == KEEP:
+                name += " (KEEP)"
+            else:
+                name += " (CULL)"
+
             ### PUBLISHERS ###
             p = games[bg_id][PUBLISHERS][0] # only use the first publisher, usually the English one
             if p not in publishers:
-                publishers[p] = defaultdict(int)
+                publishers[p] = {KEEP: 0, CULL: 0, GAMES_LIST: []}
             verdict = games[bg_id][VERDICT]
             publishers[p][verdict] += 1
+            publishers[p][GAMES_LIST].append(name)
+
 
             ### ARTISTS ###
             for a in games[bg_id][ARTISTS]:
                 if a not in artists:
-                    artists[a] = defaultdict(int)
+                    artists[a] = {KEEP: 0, CULL: 0, GAMES_LIST: []}
                 verdict = games[bg_id][VERDICT]
                 artists[a][verdict] += 1
+                artists[a][GAMES_LIST].append(name)
 
             ### DESIGNERS ###
             for d in games[bg_id][DESIGNERS]:
                 if d not in designers:
-                    designers[d] = defaultdict(int)
+                    designers[d] = {KEEP: 0, CULL: 0, GAMES_LIST: []}
                 verdict = games[bg_id][VERDICT]
                 designers[d][verdict] += 1
+                designers[d][GAMES_LIST].append(name)
 
             ### OTHER ###
             for field in fields:
                 agg[verdict][field].append(games[bg_id][field])
 
-    pubs = list(sorted(publishers.items(), key=lambda x: x[1][KEEP], reverse=True))
-    artists_sorted = list(sorted(artists.items(), key=lambda x: (x[1][CULL]-x[1][KEEP], x[1][CULL]), reverse=True))
-    designers_sorted = list(sorted(designers.items(), key=lambda x: (x[1][KEEP]-x[1][CULL], x[1][KEEP]), reverse=True))
-    cnt = 0
-    for p, d in designers_sorted:
-        print(p, KEEP, d[KEEP], CULL, d[CULL])
-        cnt += 1
-        if cnt == 5:
-            break
+    # sort first by total number of games, then by largest difference between keep and cull
+    pubs = list(sorted(publishers.items(), key=lambda x: (x[1][KEEP]+x[1][CULL], x[1][KEEP]-x[1][CULL]), reverse=True))
+    artists_sorted = list(sorted(artists.items(), key=lambda x: (x[1][KEEP]+x[1][CULL], x[1][KEEP]-x[1][CULL]), reverse=True))
+    designers_sorted = list(sorted(designers.items(), key=lambda x: (x[1][KEEP]+x[1][CULL], x[1][KEEP]-x[1][CULL]), reverse=True))
+
+    # write the output to CSV
+    with open("designers.csv", "w") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Designer", "# Keep", "# Cull", "Total Games by This Designer", "Games"])
+
+        for p, d in designers_sorted:
+            games = "\n".join(sorted(d[GAMES_LIST]))
+            writer.writerow([p, d[KEEP], d[CULL], d[KEEP]+d[CULL], games])
+
+    with open("artists.csv", "w") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Artist", "# Keep", "# Cull", "Total Games by This Artist", "Games"])
+
+        for a, d in artists_sorted:
+            games = "\n".join(sorted(d[GAMES_LIST]))
+            writer.writerow([a, d[KEEP], d[CULL], d[KEEP]+d[CULL], games])
+
+    with open("publishers.csv", "w") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Publisher", "# Keep", "# Cull", "Total Games by This Publisher", "Games"])
+
+        for p, d in pubs:
+            games = "\n".join(sorted(d[GAMES_LIST]))
+            writer.writerow([p, d[KEEP], d[CULL], d[KEEP]+d[CULL], games])
 
     for verdict in [KEEP, CULL]:
         print(verdict)
-        for field in fields:
+        for field in [COMPLEXITY, RATING, RANK, YEAR, NUM_COMMENTS, NUM_RATINGS]:
             L = [f for f in agg[verdict][field] if type(f) != str]
             print("    -", field, sum(L) / len(L))
