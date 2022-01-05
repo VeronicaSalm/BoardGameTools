@@ -1,5 +1,5 @@
 # Expects in the same directory the file
-# "bgg_links.csv"
+# "Keep_or_Cull_Links.csv"
 # whose second column is consists of links to games on bgg.
 
 # This script:
@@ -10,6 +10,7 @@
 import xml.sax
 import sys, os, csv, glob, json
 import subprocess
+import time
 from settings import DEBUG, ID, NAME, YEAR, RANK, MIN_PLAYERS, MAX_PLAYERS, \
                      COMPLEXITY, RATING, NUM_RATINGS, NUM_COMMENTS, DESIGNERS, \
                      PUBLISHERS, ARTISTS
@@ -122,11 +123,12 @@ class BoardGameHandler(xml.sax.ContentHandler):
     def characters(self, content):
         pass
 
-if __name__ == "__main__":
-    in_csv = "Keep_or_Cull_Links.csv"
-    dest = "bgg_files"
-    out_file = "bgg_stats.json"
-
+def create_dest_dir(dest):
+    """
+    Ensures that the destination directory [dest] (where output
+    will be stored) exists and is either empty or the user confirms
+    that any existing files should not be deleted.
+    """
     # if the destination folder doesn't exist, create it
     if not os.path.isdir(dest):
         print("Creating destination directory...", end=" ")
@@ -142,7 +144,14 @@ if __name__ == "__main__":
             os.system("mkdir {}".format(dest))
             print("Done!")
         else:
-            print("Okay. Will not overwrite old files.")
+            print("Okay. Will not delete old files.")
+
+if __name__ == "__main__":
+    in_csv = "Keep_or_Cull_Links.csv"
+    dest = "bgg_files"
+    out_file = "bgg_stats.json"
+
+    create_dest_dir(dest)
 
     # create an XMLReader
     parser = xml.sax.make_parser()
@@ -156,7 +165,6 @@ if __name__ == "__main__":
     current = os.getcwd()
     prefix = "https://www.boardgamegeek.com/xmlapi2/thing?"
     CNT = 0
-    download = True
     with open(in_csv, "r") as f:
         reader = csv.reader(f)
         reader.__next__() # skip header
@@ -165,11 +173,6 @@ if __name__ == "__main__":
             url = row[1]
             bg_id = url.split("/")[-2]
             bg_id = bg_id.strip()
-
-            if not download:
-                # If we got an error, skip downloading all future files
-                # Most likely, this was an API limit issue
-                continue
 
             if os.path.exists(f"{bg_id}.xml"):
                 # avoid downloading a game we already have
@@ -181,12 +184,25 @@ if __name__ == "__main__":
             arg1 = f"-O{bg_id}.xml"
             arg2 = prefix + f"id={bg_id}&stats=1"
             result = subprocess.run([command, arg1, arg2])
+            ERR_TOO_MANY_REQUESTS = 8
             if result.returncode:
-                print("Error! Process did not download data correctly.")
-                os.system(f"rm {bg_id}.xml")
-                download = False
-            else:
-                CNT += 1
+                while result.returncode:
+                    # Print error message
+                    if result.returncode == ERR_TOO_MANY_REQUESTS:
+                        print("Maximum requests exceeded... waiting 10 seconds and trying again.")
+                        os.system(f"rm {bg_id}.xml")
+                    else:
+                        print(f"Encountered unexpected error: {result.returncode}. Quitting...")
+                        os.system(f"rm {bg_id}.xml")
+                        sys.exit()
+
+
+                    # Wait 10 seconds and try again
+                    time.sleep(10)
+                    result = subprocess.run([command, arg1, arg2])
+
+            # Once we have downloaded the file successfully, move to the next one
+            CNT += 1
     os.chdir(current)
 
     for fname in sorted(glob.glob(dest+"/*.xml")):
