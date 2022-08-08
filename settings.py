@@ -24,3 +24,4 @@ KEEP= "KEEP"
 CULL = "CULL"
 
 GAMES_LIST = "games"
+DEMO = 4
